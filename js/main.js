@@ -60,11 +60,12 @@ function wireSettingsPanel() {
   const clearBtn = document.getElementById('settings-clear');
   const urlInput = document.getElementById('settings-sheet-url');
 
-  // Toggle open/close
+  // Toggle open/close — use a class instead of reading inline style,
+  // which can return '' vs 'none' inconsistently across browsers.
   toggle.addEventListener('click', () => {
-    const isOpen = panel.style.display !== 'none';
-    panel.style.display = isOpen ? 'none' : 'block';
-    toggle.textContent  = isOpen ? '⚙ Settings' : '✕ Close';
+    const isOpen = panel.classList.contains('is-open');
+    panel.classList.toggle('is-open', !isOpen);
+    toggle.textContent = isOpen ? '⚙ Settings' : '✕ Close';
   });
 
   // Live-extract ID as user types
@@ -86,7 +87,7 @@ function wireSettingsPanel() {
 
     saveSettings(sheetId, sheetName);
     updateSheetPreview(sheetId);
-    panel.style.display = 'none';
+    panel.classList.remove('is-open');
     toggle.textContent  = '⚙ Settings';
 
     // Re-sync with new sheet

@@ -565,10 +565,15 @@ header {
    Settings Panel
 ───────────────────────────────────────── */
 .settings-panel {
+  display: none;
   background: var(--surface);
   border: 1px solid var(--accent2);
   padding: 24px 28px;
   margin-bottom: 20px;
+}
+
+.settings-panel.is-open {
+  display: block;
 }
 
 .settings-title {
