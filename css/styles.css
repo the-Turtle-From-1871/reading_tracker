@@ -542,6 +542,173 @@ header {
 }
 
 /* ─────────────────────────────────────────
+   Settings Toggle (header button)
+───────────────────────────────────────── */
+.settings-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted2);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  letter-spacing: 0.04em;
+}
+
+.settings-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ─────────────────────────────────────────
+   Settings Panel
+───────────────────────────────────────── */
+.settings-panel {
+  background: var(--surface);
+  border: 1px solid var(--accent2);
+  padding: 24px 28px;
+  margin-bottom: 20px;
+}
+
+.settings-title {
+  font-size: 0.75rem;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.settings-desc {
+  font-size: 0.65rem;
+  color: var(--muted2);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.settings-desc strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.settings-fields {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.settings-field--narrow {
+  flex: 0 0 160px;
+  min-width: 140px;
+}
+
+.settings-field label {
+  font-size: 0.58rem;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.settings-field input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+.settings-field input:focus {
+  border-color: var(--accent);
+}
+
+.settings-field input::placeholder {
+  color: var(--muted);
+}
+
+.sheet-id-preview {
+  font-size: 0.6rem;
+  color: var(--muted);
+  min-height: 16px;
+  transition: color 0.2s;
+}
+
+.settings-note {
+  font-size: 0.62rem;
+  color: var(--muted2);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.settings-note em {
+  color: var(--text);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.settings-error {
+  font-size: 0.62rem;
+  color: var(--red);
+  min-height: 18px;
+  margin-bottom: 4px;
+}
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.settings-save {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 9px 22px;
+  cursor: pointer;
+  transition: background 0.15s;
+  letter-spacing: 0.04em;
+}
+
+.settings-save:hover {
+  background: var(--accent2);
+}
+
+.settings-clear {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.settings-clear:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* ─────────────────────────────────────────
    Import Panel
 ───────────────────────────────────────── */
 .import-panel {

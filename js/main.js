@@ -2,8 +2,15 @@
  * main.js — App entry point
  *
  * Orchestrates data loading, stat calculation, and rendering.
+ * Sheet ID is stored in localStorage so each user's settings
+ * stay in their own browser and never affect anyone else.
+ *
  * Depends on: data.js, loader.js, tooltip.js, charts.js
  */
+
+// ── localStorage keys ─────────────────────────────────────────────
+const LS_SHEET_ID   = 'readingTracker_sheetId';
+const LS_SHEET_NAME = 'readingTracker_sheetName';
 
 // ── Date helpers ──────────────────────────────────────────────────
 
@@ -13,8 +20,94 @@ function dateKey(d) {
 function formatDateShort(d) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
-function formatDateLong(d) {
-  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+// ── Settings panel ─────────────────────────────────────────────────
+
+function loadSettings() {
+  return {
+    sheetId:   localStorage.getItem(LS_SHEET_ID)   || '',
+    sheetName: localStorage.getItem(LS_SHEET_NAME) || 'ReadingLog',
+  };
+}
+
+function saveSettings(sheetId, sheetName) {
+  localStorage.setItem(LS_SHEET_ID,   sheetId);
+  localStorage.setItem(LS_SHEET_NAME, sheetName);
+}
+
+function populateSettingsFields() {
+  const { sheetId, sheetName } = loadSettings();
+  document.getElementById('settings-sheet-url').value  = sheetId;
+  document.getElementById('settings-sheet-name').value = sheetName;
+  updateSheetPreview(sheetId);
+}
+
+function updateSheetPreview(sheetId) {
+  const preview = document.getElementById('sheet-id-preview');
+  if (sheetId) {
+    preview.textContent = `ID: ${sheetId}`;
+    preview.style.color = 'var(--green)';
+  } else {
+    preview.textContent = 'No sheet configured — using built-in data';
+    preview.style.color = 'var(--muted)';
+  }
+}
+
+function wireSettingsPanel() {
+  const toggle   = document.getElementById('settings-toggle');
+  const panel    = document.getElementById('settings-panel');
+  const saveBtn  = document.getElementById('settings-save');
+  const clearBtn = document.getElementById('settings-clear');
+  const urlInput = document.getElementById('settings-sheet-url');
+
+  // Toggle open/close
+  toggle.addEventListener('click', () => {
+    const isOpen = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : 'block';
+    toggle.textContent  = isOpen ? '⚙ Settings' : '✕ Close';
+  });
+
+  // Live-extract ID as user types
+  urlInput.addEventListener('input', () => {
+    const extracted = Loader.extractSheetId(urlInput.value);
+    updateSheetPreview(extracted || '');
+  });
+
+  // Save
+  saveBtn.addEventListener('click', async () => {
+    const raw       = urlInput.value.trim();
+    const sheetId   = Loader.extractSheetId(raw) || raw;
+    const sheetName = document.getElementById('settings-sheet-name').value.trim() || 'ReadingLog';
+
+    if (!sheetId) {
+      showSettingsError('Please enter a Google Sheet URL or ID.');
+      return;
+    }
+
+    saveSettings(sheetId, sheetName);
+    updateSheetPreview(sheetId);
+    panel.style.display = 'none';
+    toggle.textContent  = '⚙ Settings';
+
+    // Re-sync with new sheet
+    await syncData();
+  });
+
+  // Clear — removes saved settings and reloads with fallback data
+  clearBtn.addEventListener('click', () => {
+    localStorage.removeItem(LS_SHEET_ID);
+    localStorage.removeItem(LS_SHEET_NAME);
+    urlInput.value = '';
+    document.getElementById('settings-sheet-name').value = 'ReadingLog';
+    updateSheetPreview('');
+    showSettingsError('');
+    renderAll(parseEntries());
+    setImportStatus('fallback', parseEntries().length);
+  });
+}
+
+function showSettingsError(msg) {
+  document.getElementById('settings-error').textContent = msg;
 }
 
 // ── Status panel ──────────────────────────────────────────────────
@@ -23,7 +116,7 @@ const STATUS_LABELS = {
   gviz:     { icon: '🟢', text: 'Live — synced directly from Google Sheets' },
   proxy:    { icon: '🟡', text: 'Live — synced via CORS proxy' },
   upload:   { icon: '🔵', text: 'Loaded from uploaded CSV file' },
-  fallback: { icon: '🟠', text: 'Using built-in data — live sync unavailable' },
+  fallback: { icon: '🟠', text: 'Using built-in demo data — configure your sheet in Settings' },
 };
 
 function setImportStatus(source, entryCount) {
@@ -33,18 +126,17 @@ function setImportStatus(source, entryCount) {
   document.getElementById('import-status-text').textContent = s.text;
   document.getElementById('import-entry-count').textContent = `${entryCount} sessions loaded`;
 
-  // Show the re-sync button only when live sync actually worked
   const resyncBtn = document.getElementById('resync-btn');
   resyncBtn.style.display = (source === 'gviz' || source === 'proxy') ? 'inline-block' : 'none';
 
-  panel.classList.remove('panel-loading');
+  panel.classList.remove('panel-loading', 'panel-ok', 'panel-warn');
   panel.classList.add(source === 'fallback' ? 'panel-warn' : 'panel-ok');
 }
 
 function setImportLoading(msg) {
   const panel = document.getElementById('import-panel');
-  panel.classList.add('panel-loading');
   panel.classList.remove('panel-ok', 'panel-warn');
+  panel.classList.add('panel-loading');
   document.getElementById('import-status-icon').textContent = '⏳';
   document.getElementById('import-status-text').textContent = msg;
   document.getElementById('import-entry-count').textContent = '';
@@ -54,9 +146,9 @@ function setImportLoading(msg) {
 
 function calculateStreaks(sortedDates) {
   const dateSet = new Set(sortedDates.map(d => d.dateKey));
-
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
   let currentStreak = 0;
   const check = new Date(today);
   while (dateSet.has(dateKey(check))) {
@@ -120,13 +212,23 @@ function updateStreakBanner(currentStreak, longestStreak) {
 // ── Render pipeline ───────────────────────────────────────────────
 
 function renderAll(entries) {
-  const byDate      = aggregateByDate(entries);           // data.js
+  const byDate      = aggregateByDate(entries);
   const sortedDates = Object.values(byDate).sort((a, b) => a.dateKey.localeCompare(b.dateKey));
-
   updateStats(sortedDates, entries);
-  Charts.renderHeatmap(byDate, READING_YEAR);             // charts.js
-  Charts.renderBarChart(byDate);                          // charts.js
-  Charts.renderBooks(entries);                            // charts.js
+  Charts.renderHeatmap(byDate, READING_YEAR);
+  Charts.renderBarChart(byDate);
+  Charts.renderBooks(entries);
+}
+
+// ── Sync ──────────────────────────────────────────────────────────
+
+async function syncData() {
+  const { sheetId, sheetName } = loadSettings();
+  const label = sheetId ? 'Connecting to Google Sheets…' : 'Loading built-in data…';
+  setImportLoading(label);
+  const { entries, source } = await Loader.loadAuto(sheetId, sheetName);
+  renderAll(entries);
+  setImportStatus(source, entries.length);
 }
 
 // ── Event wiring ──────────────────────────────────────────────────
@@ -149,27 +251,17 @@ function wireUploadButton() {
       document.getElementById('import-status-text').textContent = `Upload failed: ${e.message}`;
       document.getElementById('import-panel').classList.add('panel-warn');
     }
-    input.value = ''; // reset so same file can be re-uploaded
+    input.value = '';
   });
 }
 
 function wireResyncButton() {
-  document.getElementById('resync-btn').addEventListener('click', async () => {
-    setImportLoading('Re-syncing from Google Sheets…');
-    try {
-      const { entries, source } = await Loader.loadAuto();
-      renderAll(entries);
-      setImportStatus(source, entries.length);
-    } catch (e) {
-      document.getElementById('import-status-text').textContent = `Sync failed: ${e.message}`;
-    }
-  });
+  document.getElementById('resync-btn').addEventListener('click', syncData);
 }
 
 function wireDragDrop() {
   const zone = document.getElementById('drop-zone');
-
-  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragover',  e  => { e.preventDefault(); zone.classList.add('drag-over'); });
   zone.addEventListener('dragleave', ()  => zone.classList.remove('drag-over'));
   zone.addEventListener('drop', async e => {
     e.preventDefault();
@@ -190,14 +282,12 @@ function wireDragDrop() {
 // ── Init ──────────────────────────────────────────────────────────
 
 async function init() {
+  populateSettingsFields();
+  wireSettingsPanel();
   wireUploadButton();
   wireResyncButton();
   wireDragDrop();
-
-  setImportLoading('Connecting to Google Sheets…');
-  const { entries, source } = await Loader.loadAuto();
-  renderAll(entries);
-  setImportStatus(source, entries.length);
+  await syncData();
 }
 
 init();

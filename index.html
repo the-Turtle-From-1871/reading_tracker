@@ -18,13 +18,53 @@
         <div class="logo-sub">Josh Yang · Carnegie Mellon University</div>
       </div>
       <div class="header-right">
-        <a class="sheet-link"
-           href="https://docs.google.com/spreadsheets/d/1F1JeDrFzp8hg6cg5fK79EJSN27VPGtb32p6_vK9JD1s"
-           target="_blank" rel="noopener">
-          Open Google Sheet ↗
-        </a>
+        <button class="settings-toggle" id="settings-toggle">⚙ Settings</button>
       </div>
     </header>
+
+    <!-- ── Settings Panel ────────────────────────────────────────── -->
+    <div class="settings-panel" id="settings-panel" style="display:none">
+      <div class="settings-title">⚙ Google Sheet Configuration</div>
+      <p class="settings-desc">
+        Your settings are saved in <strong>your browser only</strong> — they don't affect anyone else using this app.
+      </p>
+
+      <div class="settings-fields">
+        <div class="settings-field">
+          <label for="settings-sheet-url">Google Sheet URL or ID</label>
+          <input
+            type="text"
+            id="settings-sheet-url"
+            placeholder="Paste your Google Sheet URL here…"
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <div class="sheet-id-preview" id="sheet-id-preview">No sheet configured</div>
+        </div>
+
+        <div class="settings-field settings-field--narrow">
+          <label for="settings-sheet-name">Tab name</label>
+          <input
+            type="text"
+            id="settings-sheet-name"
+            value="ReadingLog"
+            placeholder="e.g. ReadingLog"
+            spellcheck="false"
+          >
+        </div>
+      </div>
+
+      <div class="settings-note">
+        📋 Make sure your sheet is shared: <em>Share → Anyone with the link → Viewer</em>
+      </div>
+
+      <div class="settings-error" id="settings-error"></div>
+
+      <div class="settings-actions">
+        <button class="settings-save" id="settings-save">Save &amp; Sync</button>
+        <button class="settings-clear" id="settings-clear">Clear saved settings</button>
+      </div>
+    </div>
 
     <!-- ── Import Panel ─────────────────────────────────────────── -->
     <div class="import-panel" id="import-panel">

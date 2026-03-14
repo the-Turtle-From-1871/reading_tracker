@@ -7,17 +7,20 @@
  *   3. CSV file upload by the user
  *   4. Hardcoded fallback data from data.js
  *
- * Depends on: data.js (for parseEntries fallback and column constants)
+ * The Sheet ID is never hardcoded here — it is always passed in by the
+ * caller (read from localStorage by main.js), so each user's settings
+ * are stored only in their own browser and never affect anyone else.
+ *
+ * Depends on: data.js (for parseEntries fallback)
  * Used by:    main.js
  */
 
 const Loader = (() => {
 
-  const SHEET_ID   = '1F1JeDrFzp8hg6cg5fK79EJSN27VPGtb32p6_vK9JD1s';
-  const SHEET_NAME = 'ReadingLog';
   const TIMEOUT_MS = 8000;
 
-  // Column indices (0-based) in the sheet
+  // Column indices (0-based) matching the TL;DR Reading Log sheet structure.
+  // If your sheet has a different layout, adjust these here.
   const COL = { MONTH: 1, DAY: 2, TITLE: 3, AUTHOR: 4, GENRE: 8, TIME: 9, PAGES: 10, THOUGHTS: 15 };
 
   const MONTH_MAP = {
@@ -27,7 +30,22 @@ const Loader = (() => {
     october:10, oct:10, november:11, nov:11, december:12, dec:12,
   };
 
-  // ── Fetch helpers ───────────────────────────────────────────────
+  // ── Sheet ID helpers ────────────────────────────────────────────
+
+  /**
+   * Extract a bare Sheet ID from whatever the user pasted —
+   * a full URL, a /d/ID/edit URL, or a raw ID string.
+   */
+  function extractSheetId(input) {
+    const s = (input || '').trim();
+    const match = s.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    if (match) return match[1];
+    // If it looks like a bare ID (no slashes), use as-is
+    if (/^[a-zA-Z0-9_-]{20,}$/.test(s)) return s;
+    return null;
+  }
+
+  // ── Fetch helpers ────────────────────────────────────────────────
 
   function fetchWithTimeout(url, ms = TIMEOUT_MS) {
     const controller = new AbortController();
@@ -35,14 +53,13 @@ const Loader = (() => {
     return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer));
   }
 
-  // ── Strategy 1: Google gviz JSON (JSONP-free, works from http/https) ──
+  // ── Strategy 1: Google gviz JSON ─────────────────────────────────
 
-  async function tryGviz() {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}`;
+  async function tryGviz(sheetId, sheetName) {
+    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
     const res  = await fetchWithTimeout(url);
     if (!res.ok) throw new Error(`gviz HTTP ${res.status}`);
     const text = await res.text();
-    // Google wraps the JSON in a callback: /*O_o*/\ngoogle.visualization.Query.setResponse({...});
     const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
     if (!match) throw new Error('gviz: unexpected response format');
     const json = JSON.parse(match[1]);
@@ -54,19 +71,19 @@ const Loader = (() => {
     for (const row of (table.rows || [])) {
       const cells    = row.c || [];
       const monthRaw = String(cells[COL.MONTH]?.v ?? cells[COL.MONTH]?.f ?? '').trim().toLowerCase();
-      const dayRaw   = String(cells[COL.DAY]?.v   ?? '').trim();
+      const dayRaw   = String(cells[COL.DAY]?.v ?? '').trim();
       const monthNum = MONTH_MAP[monthRaw];
       const dayNum   = parseInt(dayRaw, 10);
       if (!monthNum || !dayNum) continue;
-      entries.push(buildEntry(monthNum, dayNum, cells));
+      entries.push(buildEntry(monthNum, dayNum, cells, false));
     }
     return entries;
   }
 
-  // ── Strategy 2: allorigins CORS proxy → CSV export ───────────────
+  // ── Strategy 2: allorigins CORS proxy ────────────────────────────
 
-  async function tryProxy() {
-    const csvUrl  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+  async function tryProxy(sheetId) {
+    const csvUrl   = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
     const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(csvUrl)}`;
     const res = await fetchWithTimeout(proxyUrl);
     if (!res.ok) throw new Error(`proxy HTTP ${res.status}`);
@@ -74,12 +91,12 @@ const Loader = (() => {
     return parseCSVText(json.contents);
   }
 
-  // ── CSV parsing (used by proxy + file upload) ─────────────────────
+  // ── CSV parsing ───────────────────────────────────────────────────
 
   function parseCSVText(text) {
     const rows    = parseCSV(text);
     const entries = [];
-    for (let i = 1; i < rows.length; i++) {          // skip header row
+    for (let i = 1; i < rows.length; i++) {
       const r        = rows[i];
       const monthRaw = (r[COL.MONTH] ?? '').trim().toLowerCase();
       const dayRaw   = (r[COL.DAY]   ?? '').trim();
@@ -155,24 +172,25 @@ const Loader = (() => {
   // ── Public API ────────────────────────────────────────────────────
 
   /**
-   * Try all live strategies in order. Returns { entries, source }.
-   * source is one of: 'gviz' | 'proxy' | 'fallback'
+   * Try live strategies in order using the provided sheet ID.
+   * Falls back to hardcoded data if all live methods fail.
+   * @param {string} sheetId   - bare Google Sheet ID
+   * @param {string} sheetName - tab name (default 'ReadingLog')
+   * @returns {{ entries: Array, source: string }}
    */
-  async function loadAuto() {
-    try {
-      const entries = await tryGviz();
-      if (entries.length) return { entries, source: 'gviz' };
-      throw new Error('gviz: no entries parsed');
-    } catch (e) {
-      console.warn('gviz failed:', e.message);
-    }
+  async function loadAuto(sheetId, sheetName = 'ReadingLog') {
+    if (sheetId) {
+      try {
+        const entries = await tryGviz(sheetId, sheetName);
+        if (entries.length) return { entries, source: 'gviz' };
+        throw new Error('gviz: no entries parsed');
+      } catch (e) { console.warn('gviz failed:', e.message); }
 
-    try {
-      const entries = await tryProxy();
-      if (entries.length) return { entries, source: 'proxy' };
-      throw new Error('proxy: no entries parsed');
-    } catch (e) {
-      console.warn('proxy failed:', e.message);
+      try {
+        const entries = await tryProxy(sheetId);
+        if (entries.length) return { entries, source: 'proxy' };
+        throw new Error('proxy: no entries parsed');
+      } catch (e) { console.warn('proxy failed:', e.message); }
     }
 
     return { entries: loadFallback(), source: 'fallback' };
@@ -186,5 +204,5 @@ const Loader = (() => {
     return { entries, source: 'upload' };
   }
 
-  return { loadAuto, loadFromUpload };
+  return { loadAuto, loadFromUpload, extractSheetId };
 })();
