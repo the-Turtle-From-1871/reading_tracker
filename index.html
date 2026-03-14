@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TL;DR Reading Log — Josh Yang</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="container">
+
+    <header>
+      <div class="logo">
+        <div class="logo-eyebrow">Reading Habits Dashboard</div>
+        <h1>Reading <em>Log</em></h1>
+        <div class="logo-sub">Josh Yang · Carnegie Mellon University</div>
+      </div>
+      <div class="header-right">
+        <a class="sheet-link"
+           href="https://docs.google.com/spreadsheets/d/1F1JeDrFzp8hg6cg5fK79EJSN27VPGtb32p6_vK9JD1s"
+           target="_blank" rel="noopener">
+          Open Google Sheet ↗
+        </a>
+      </div>
+    </header>
+
+    <!-- ── Import Panel ─────────────────────────────────────────── -->
+    <div class="import-panel" id="import-panel">
+
+      <div class="import-status">
+        <span class="import-status-icon" id="import-status-icon">⏳</span>
+        <div class="import-status-body">
+          <span class="import-status-text" id="import-status-text">Connecting to Google Sheets…</span>
+          <span class="import-entry-count" id="import-entry-count"></span>
+        </div>
+        <button class="resync-btn" id="resync-btn" style="display:none" title="Re-sync from Google Sheets">
+          ↺ Re-sync
+        </button>
+      </div>
+
+      <div class="import-divider"></div>
+
+      <!-- Drop zone + upload button -->
+      <div class="import-upload" id="drop-zone">
+        <div class="drop-icon">📂</div>
+        <div class="drop-text">
+          <strong>Upload a CSV export</strong>
+          <span>Drag & drop, or click to browse</span>
+          <span class="drop-hint">
+            In Google Sheets: <em>File → Download → CSV</em>
+          </span>
+        </div>
+        <button class="upload-btn" id="upload-btn" type="button">Choose file</button>
+        <input type="file" id="csv-upload" accept=".csv" style="display:none">
+      </div>
+
+    </div>
+
+    <!-- ── Stats ────────────────────────────────────────────────── -->
+    <div class="stats-grid">
+      <div class="stat">
+        <div class="stat-label">Total Pages</div>
+        <div class="stat-value gold" id="stat-pages">—</div>
+        <div class="stat-sub">this year</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Days Read</div>
+        <div class="stat-value" id="stat-days">—</div>
+        <div class="stat-sub">sessions logged</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Books</div>
+        <div class="stat-value gold" id="stat-books">—</div>
+        <div class="stat-sub">titles</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Avg Pages/Day</div>
+        <div class="stat-value" id="stat-avg">—</div>
+        <div class="stat-sub">on reading days</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Best Day</div>
+        <div class="stat-value gold" id="stat-best">—</div>
+        <div class="stat-sub" id="stat-best-sub">pages</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Longest Streak</div>
+        <div class="stat-value" id="stat-streak">—</div>
+        <div class="stat-sub">days</div>
+      </div>
+    </div>
+
+    <!-- ── Streak Banner ─────────────────────────────────────────── -->
+    <div id="streak-banner" style="display:none" aria-live="polite">
+      <div class="streak-icon">🔥</div>
+      <div class="streak-content">
+        <strong id="streak-text">—</strong>
+        <p id="streak-sub">—</p>
+      </div>
+    </div>
+
+    <!-- ── Heatmap ───────────────────────────────────────────────── -->
+    <section class="calendar-section" aria-label="Reading heatmap">
+      <div class="section-label">Reading Heatmap — 2025</div>
+      <div class="calendar-scroll">
+        <div class="calendar-outer" id="cal-outer"></div>
+      </div>
+      <div class="cal-legend" aria-label="Heatmap legend">
+        <span>Less</span>
+        <div class="legend-cell" style="background:var(--heat0)"></div>
+        <div class="legend-cell" style="background:var(--heat1)"></div>
+        <div class="legend-cell" style="background:var(--heat2)"></div>
+        <div class="legend-cell" style="background:var(--heat3)"></div>
+        <div class="legend-cell" style="background:var(--heat4)"></div>
+        <span>More pages</span>
+      </div>
+    </section>
+
+    <!-- ── Bar Chart ─────────────────────────────────────────────── -->
+    <section class="bar-chart-section" aria-label="Pages per month">
+      <div class="section-label">Pages per Month</div>
+      <div class="bar-chart" id="bar-chart"></div>
+    </section>
+
+    <!-- ── Books ─────────────────────────────────────────────────── -->
+    <section class="books-section" aria-label="Books list">
+      <div class="section-label">Books This Year</div>
+      <div class="books-grid" id="books-grid"></div>
+    </section>
+
+  </div>
+
+  <!-- Tooltip -->
+  <div id="tooltip" role="tooltip" aria-hidden="true">
+    <div class="tip-date"     id="tip-date"></div>
+    <div class="tip-book"     id="tip-book"></div>
+    <div class="tip-pages"    id="tip-pages"></div>
+    <div class="tip-time"     id="tip-time"></div>
+    <div class="tip-thoughts" id="tip-thoughts"></div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/loader.js"></script>
+  <script src="js/tooltip.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
